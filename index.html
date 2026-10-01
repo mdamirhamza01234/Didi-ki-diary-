@@ -317,7 +317,7 @@ html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
   <div class="cset" id="cset">
     Gemini API Key
     <input id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
-    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br><label><input type="checkbox" id="scanOff" checked>Scan handwriting offline (no internet, no key needed; Gemini only if offline scan fails)</label><br><button onclick="saveSet()">Save</button>
+    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br><label>Handwriting scan mode<select id="scanMode" style="width:100%;padding:10px;font-size:15px;margin:6px 0 10px"><option value="auto">Auto: Gemini when online, offline otherwise</option><option value="offline">Offline only (no internet needed)</option><option value="gemini">Gemini only</option></select></label><br><button onclick="saveSet()">Save</button>
     <button style="background:#eee;color:#333" onclick="clearChat()">Clear chat</button>
   </div>
   <div class="msgs" id="msgs"></div>
@@ -363,7 +363,7 @@ html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
   <h3><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Note from photo (AI scanner)</h3><small>Reads handwriting and converts it to text (works offline)</small>
   <div id="scanSt"></div>
   <img id="scanPrev" alt="" style="display:none;width:100%;max-height:220px;object-fit:contain;border:1px solid #ccd3dc;border-radius:10px;background:#fff">
-  <div class="srow"><button type="button" style="background:#eef1f5;color:#222" onclick="scanRot=(scanRot+90)%360;if(scanSrc)runScan()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 11-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Rotate photo</button></div>
+  <div class="srow"><button type="button" style="background:#eef1f5;color:#222" onclick="scanRot=(scanRot+90)%360;if(scanSrc)runScan()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 11-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Rotate photo</button></div><div class="srow" style="margin-top:6px"><select id="scanLang" onchange="scanLangChg()" style="flex:1;padding:10px;font-size:15px;border-radius:10px"><option value="hin+eng">Offline language: Hindi + English</option><option value="eng">Offline language: English only</option><option value="hin">Offline language: Hindi only</option></select></div>
   <div id="scanForm" style="display:none">
     <input id="scanTitle" class="tags" style="color:inherit;font-weight:700;font-size:18px;margin:4px 0 8px" placeholder="Note title (optional)">
     <textarea id="scanText" rows="10"></textarea>
@@ -655,7 +655,7 @@ async function scanAI(b64){
 
 /* ---------- Offline handwriting scanner (Tesseract.js, runs on the phone) ---------- */
 const OCR_CDN="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/",OCR_CORE="https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/",OCR_LANG="https://tessdata.projectnaptha.com/4.0.0_fast";
-let ocrW=null;
+let ocrW=null,ocrL="";
 async function ocrFile(name,cdn){
   try{const x=await fetch("ocr/"+name);if(x.ok&&!/html/.test(x.headers.get("content-type")||"")){try{x.body&&x.body.cancel()}catch(e){}return new URL("ocr/"+name,location.href).href}}catch(e){}
   const key="nb-ocr-"+name;let c=null,r=null;
@@ -675,8 +675,9 @@ async function ocrDiag(core){
   }
   return o.join(" | ");
 }
-async function getOcr(onp){
-  if(ocrW)return ocrW;
+async function getOcr(onp,lang){
+  if(ocrW&&ocrL===lang)return ocrW;
+  if(ocrW){try{await ocrW.terminate()}catch(e){}ocrW=null}
   if(!window.Tesseract){
     const u=await ocrFile("tesseract.min.js",OCR_CDN+"tesseract.min.js");
     await new Promise((res,rej)=>{const s=document.createElement("script");s.src=u;s.onload=res;s.onerror=()=>rej(new Error("Could not load the scanner engine"));document.head.appendChild(s)});
@@ -686,9 +687,9 @@ async function getOcr(onp){
   const wp=await ocrFile("worker.min.js",OCR_CDN+"worker.min.js"),cp=await ocrFile(core,OCR_CORE+core);
   let lp=OCR_LANG;
   try{const h=await fetch("ocr/lang/hin.traineddata.gz");if(h.ok&&!/html/.test(h.headers.get("content-type")||""))lp=new URL("ocr/lang",location.href).href;try{h.body&&h.body.cancel()}catch(e){}}catch(e){}
-  try{ocrW=await Tesseract.createWorker(["hin","eng"],1,{workerPath:wp,corePath:cp,langPath:lp,workerBlobURL:false,logger:onp})}
+  try{ocrW=await Tesseract.createWorker(lang.split("+"),1,{workerPath:wp,corePath:cp,langPath:lp,workerBlobURL:false,logger:onp})}
   catch(e){ocrW=null;const dg=await ocrDiag(core);throw new Error("diag: "+dg+" || Offline scanner could not start ["+(lp.indexOf("http")===0&&lp.indexOf(location.origin)===0?"local":"internet")+" data]: "+String((e&&(e.message||e.type))||e))}
-  try{await ocrW.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"})}catch(e){}
+  ocrL=lang;try{await ocrW.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"})}catch(e){}
   return ocrW;
 }
 function ocrPrep(c){
@@ -705,22 +706,28 @@ function ocrPrep(c){
   ox.putImageData(od,0,0);return o;
 }
 async function scanOffline(c){
-  const st=document.getElementById("scanSt");
+  const st=document.getElementById("scanSt"),lang=lsGet("nb_scanlang")||"hin+eng";
+  document.getElementById("scanLang").value=lang;
   st.innerHTML=ic("sparkles")+"Starting offline scanner...";
-  const w=await getOcr(m=>{if(m&&m.status)st.innerHTML=ic("sparkles")+esc(m.status)+(m.progress?" "+Math.round(m.progress*100)+"%":"")});
+  const w=await getOcr(m=>{if(m&&m.status)st.innerHTML=ic("sparkles")+esc(m.status)+(m.progress?" "+Math.round(m.progress*100)+"%":"")},lang);
   const r=await w.recognize(ocrPrep(c));
-  const t=((r&&r.data&&r.data.text)||"").replace(/[ \t]+\n/g,"\n").replace(/\n{3,}/g,"\n\n").trim();
-  return t.replace(/\s/g,"").length<3?"NOTEXT":t;
+  const L=r&&r.data&&r.data.lines;let lines;
+  if(L&&L.length){
+    lines=L.map(l=>(l.words||[]).map(x=>{const t=(x.text||"").trim();return(!t||x.confidence<30||!/[A-Za-z0-9\u0900-\u097F]/.test(t))?"[?]":t}).join(" ").replace(/(\[\?\]\s*){2,}/g,"[?] "));
+  }else lines=((r&&r.data&&r.data.text)||"").split("\n");
+  let t=lines.map(x=>x.replace(/\s+$/,"")).filter(x=>x.replace(/\[\?\]|\s/g,"").length>0).join("\n");
+  t=t.replace(/[\u0966-\u096F]/g,ch=>String(ch.charCodeAt(0)-0x966));
+  return t.replace(/\[\?\]|\s/g,"").length<3?"NOTEXT":t;
 }
+function scanLangChg(){try{localStorage.setItem("nb_scanlang",document.getElementById("scanLang").value)}catch(e){}if(scanSrc)runScan()}
 async function scanText(c){
-  if(lsGet("nb_scanoff")!=="off"){
-    try{return await scanOffline(c)}
-    catch(e){
-      if(!(navigator.onLine&&getKey()))throw e;
-      document.getElementById("scanSt").innerHTML=ic("sparkles")+"Offline scanner not ready, using Gemini...";
-    }
+  const mode=lsGet("nb_scanmode")||"auto",st=document.getElementById("scanSt"),b64=()=>c.toDataURL("image/jpeg",.85).split(",")[1];
+  if(mode==="gemini")return scanAI(b64());
+  if(mode==="auto"&&navigator.onLine&&getKey()){
+    try{st.innerHTML=ic("sparkles")+"Gemini is reading the handwriting...";return await scanAI(b64())}
+    catch(e){st.innerHTML=ic("sparkles")+"Gemini not available, using offline scanner..."}
   }
-  return scanAI(c.toDataURL("image/jpeg",.85).split(",")[1]);
+  return scanOffline(c);
 }
 let scanSrc=null,scanRot=0;
 function drawScaled(img,deg){
@@ -849,7 +856,7 @@ function restoreChat(){history.forEach(h=>{const d=addMsg(h.role==="user"?"u":"a
 function lsGet(k){try{return localStorage.getItem(k)||""}catch(e){return""}}
 function openChat(){
   saveSilently();
-  document.getElementById("apiKey").value=DEFAULT_KEY.trim()?"":lsGet(CK);document.getElementById("ctxOn").checked=lsGet("nb_ctx")!=="off";document.getElementById("offOn").checked=lsGet("nb_offline")!=="off";document.getElementById("scanOff").checked=lsGet("nb_scanoff")!=="off";
+  document.getElementById("apiKey").value=DEFAULT_KEY.trim()?"":lsGet(CK);document.getElementById("ctxOn").checked=lsGet("nb_ctx")!=="off";document.getElementById("offOn").checked=lsGet("nb_offline")!=="off";document.getElementById("scanMode").value=lsGet("nb_scanmode")||"auto";
   
   document.getElementById("chat").classList.add("open");
   if(!getKey())document.getElementById("cset").classList.add("open");
@@ -860,7 +867,7 @@ function closeChat(){document.getElementById("chat").classList.remove("open")}
 function toggleSet(){document.getElementById("cset").classList.toggle("open")}
 function saveSet(){
   try{
-    localStorage.setItem(CK,document.getElementById("apiKey").value.trim());localStorage.removeItem("nb_models");localStorage.setItem("nb_ctx",document.getElementById("ctxOn").checked?"on":"off");localStorage.setItem("nb_offline",document.getElementById("offOn").checked?"on":"off");localStorage.setItem("nb_scanoff",document.getElementById("scanOff").checked?"on":"off");
+    localStorage.setItem(CK,document.getElementById("apiKey").value.trim());localStorage.removeItem("nb_models");localStorage.setItem("nb_ctx",document.getElementById("ctxOn").checked?"on":"off");localStorage.setItem("nb_offline",document.getElementById("offOn").checked?"on":"off");localStorage.setItem("nb_scanmode",document.getElementById("scanMode").value);
     
   }catch(e){}
   document.getElementById("cset").classList.remove("open");toast("Settings saved","ok");
