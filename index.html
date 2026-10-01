@@ -677,9 +677,9 @@ async function getOcr(onp){
   const core=simd?"tesseract-core-simd-lstm.wasm.js":"tesseract-core-lstm.wasm.js";
   const wp=await ocrFile("worker.min.js",OCR_CDN+"worker.min.js"),cp=await ocrFile(core,OCR_CORE+core);
   let lp=OCR_LANG;
-  try{const h=await fetch("ocr/lang/hin.traineddata.gz",{method:"HEAD"});if(h.ok&&!/html/.test(h.headers.get("content-type")||""))lp=new URL("ocr/lang",location.href).href}catch(e){}
+  try{const h=await fetch("ocr/lang/hin.traineddata.gz");if(h.ok&&!/html/.test(h.headers.get("content-type")||""))lp=new URL("ocr/lang",location.href).href;try{h.body&&h.body.cancel()}catch(e){}}catch(e){}
   try{ocrW=await Tesseract.createWorker(["hin","eng"],1,{workerPath:wp,corePath:cp,langPath:lp,workerBlobURL:false,logger:onp})}
-  catch(e){ocrW=null;throw new Error("Offline scanner could not start. Connect to internet once to download the Hindi/English data")}
+  catch(e){ocrW=null;throw new Error("Offline scanner could not start ["+(lp.indexOf("http")===0&&lp.indexOf(location.origin)===0?"local":"internet")+" data]: "+String((e&&(e.message||e.type))||e))}
   try{await ocrW.setParameters({tessedit_pageseg_mode:"6",preserve_interword_spaces:"1"})}catch(e){}
   return ocrW;
 }
