@@ -35,8 +35,8 @@ jobs:
           rm -rf android/app/src/main/res/mipmap-anydpi-v26
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             mkdir -p android/app/src/main/res/mipmap-$d
-            cp ic_$d.png android/app/src/main/res/mipmap-$d/ic_launcher.png
-            cp ic_${d}_round.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png
+            cp icon-512.png android/app/src/main/res/mipmap-$d/ic_launcher.png
+            cp icon-512.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png
           done
 
       - name: Build APK
