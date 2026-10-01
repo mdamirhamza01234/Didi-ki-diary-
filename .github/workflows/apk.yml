@@ -1,0 +1,49 @@
+name: Build APK
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: 17}
+
+      - name: Install packages
+        run: npm install
+
+      - name: Prepare web folder and offline OCR (Hindi + English)
+        run: |
+          mkdir -p www/ocr/lang
+          cp index.html manifest.json icon-192.png icon-512.png www/
+          cp node_modules/tesseract.js/dist/tesseract.min.js node_modules/tesseract.js/dist/worker.min.js www/ocr/
+          cp node_modules/tesseract.js-core/tesseract-core*.js www/ocr/
+          curl -fL -o www/ocr/lang/hin.traineddata.gz https://tessdata.projectnaptha.com/4.0.0_fast/hin.traineddata.gz
+          curl -fL -o www/ocr/lang/eng.traineddata.gz https://tessdata.projectnaptha.com/4.0.0_fast/eng.traineddata.gz
+          ls -la www/ocr www/ocr/lang
+
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Camera permission and app icon
+        run: |
+          sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA" />\n    <application#' android/app/src/main/AndroidManifest.xml
+          rm -rf android/app/src/main/res/mipmap-anydpi-v26
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p android/app/src/main/res/mipmap-$d
+            cp ic_$d.png android/app/src/main/res/mipmap-$d/ic_launcher.png
+            cp ic_${d}_round.png android/app/src/main/res/mipmap-$d/ic_launcher_round.png
+          done
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Didi-ki-Diary-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
