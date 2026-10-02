@@ -108,6 +108,7 @@ body{
 .cin textarea{flex:1;resize:none;height:44px;padding:11px;border:1px solid #ccd3dc;border-radius:22px;font-size:16px;font-family:inherit;outline:0}
 .cin button{width:44px;height:44px;border:0;border-radius:50%;background:#1f6feb;color:#fff;font-size:18px}
 .tags{width:100%;border:0;outline:0;background:transparent;font-size:16px;color:#1f6feb;margin:-6px 0 12px}
+.wsw{position:absolute;background:rgba(66,133,244,.2);border-radius:3px}.wsw.on{background:rgba(66,133,244,.6);outline:1px solid #8ab4f8}#wsel{position:fixed;inset:0;z-index:95;background:#0b0d12;display:none;flex-direction:column;color:#fff}#wsel.open{display:flex}
 .sov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;display:none;align-items:flex-end}
 .sov.open{display:flex}
 .sbox{background:#fff;width:100%;max-height:92dvh;overflow:auto;border-radius:18px 18px 0 0;padding:16px;box-sizing:border-box}
@@ -317,7 +318,7 @@ html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
   <div class="cset" id="cset">
     Gemini API Key
     <input id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
-    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br><label>Handwriting scan mode<select id="scanMode" style="width:100%;padding:10px;font-size:15px;margin:6px 0 10px"><option value="auto">Auto: Gemini when online, offline otherwise</option><option value="offline">Offline only (no internet needed)</option><option value="gemini">Gemini only</option></select></label><br><button onclick="saveSet()">Save</button>
+    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br><label>Handwriting scan mode<select id="scanMode" style="width:100%;padding:10px;font-size:15px;margin:6px 0 10px"><option value="auto">Auto: Gemini when online, ML Kit offline</option><option value="offline">Offline only (ML Kit, no internet needed)</option><option value="gemini">Gemini only</option></select></label><br><button onclick="saveSet()">Save</button>
     <button style="background:#eee;color:#333" onclick="clearChat()">Clear chat</button>
   </div>
   <div class="msgs" id="msgs"></div>
@@ -366,11 +367,19 @@ html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
   <div class="srow"><button type="button" style="background:#eef1f5;color:#222" onclick="scanRot=(scanRot+90)%360;if(scanSrc)runScan()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 11-2.5-5.8"/><path d="M20 4v5h-5"/></svg>Rotate photo</button></div><div class="srow" style="margin-top:6px"><select id="scanLang" onchange="scanLangChg()" style="flex:1;padding:10px;font-size:15px;border-radius:10px"><option value="hin+eng">Offline language: Hindi + English</option><option value="eng">Offline language: English only</option><option value="hin">Offline language: Hindi only</option></select></div>
   <div id="scanForm" style="display:none">
     <input id="scanTitle" class="tags" style="color:inherit;font-weight:700;font-size:18px;margin:4px 0 8px" placeholder="Note title (optional)">
+    <div class="srow" id="scanSelRow" style="display:none;margin-bottom:8px"><button type="button" onclick="openWordSel()">Select words like Google Lens</button></div>
     <textarea id="scanText" rows="10"></textarea>
     <div class="srow"><button onclick="scanSave(0)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Create new note</button><button onclick="scanSave(1)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11l-8.5 8.5a5 5 0 01-7-7L13 4a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L14 7"/></svg>Add to open note</button></div>
   </div>
   <button class="sx" onclick="closeScan()">Close</button>
 </div></div>
+<div id="wsel">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px"><button type="button" onclick="wsClose()" style="background:none;border:0;color:#fff;font-size:15px;padding:6px 10px">&larr; Back</button><div style="font-size:13px;opacity:.8">Tap a word, or drag over many words</div></div>
+  <div id="wselMid" style="flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden"><div id="wselBox" style="position:relative;touch-action:none;user-select:none;-webkit-user-select:none"></div></div>
+  <div style="padding:10px 14px 16px"><div id="wselCnt" style="font-size:14px;margin-bottom:8px;opacity:.9"></div>
+    <div style="display:flex;gap:8px"><button type="button" onclick="wsAll()" style="flex:1;padding:12px;border:0;border-radius:10px;background:#2b303b;color:#fff;font-size:15px">Select all</button><button type="button" onclick="wsClear()" style="flex:1;padding:12px;border:0;border-radius:10px;background:#2b303b;color:#fff;font-size:15px">Clear</button></div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" onclick="wsCopy()" style="flex:1;padding:12px;border:0;border-radius:10px;background:#1a73e8;color:#fff;font-size:15px">Copy</button><button type="button" onclick="wsUse()" style="flex:1;padding:12px;border:0;border-radius:10px;background:#1a73e8;color:#fff;font-size:15px">Use as note text</button></div></div>
+</div>
 <div id="mmenu" class="cmenu" style="position:fixed;left:auto;right:12px;bottom:84px;z-index:20">
   <button onclick="pickM('mCam')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take photo</button>
   <button onclick="pickM('mVid')"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>Record video</button>
@@ -717,9 +726,97 @@ async function scanOffline(c){
   }else lines=((r&&r.data&&r.data.text)||"").split("\n");
   let t=lines.map(x=>x.replace(/\s+$/,"")).filter(x=>x.replace(/\[\?\]|\s/g,"").length>0).join("\n");
   t=t.replace(/[\u0966-\u096F]/g,ch=>String(ch.charCodeAt(0)-0x966));
+  const els=[];
+  if(L&&L.length)L.forEach((l,li)=>(l.words||[]).forEach(x=>{const wt=(x.text||"").trim();if(wt&&x.confidence>=30&&x.bbox&&/[A-Za-z0-9\u0900-\u097F]/.test(wt))els.push({t:fixDigits(wt),l:x.bbox.x0,tp:x.bbox.y0,r:x.bbox.x1,b:x.bbox.y1,ln:li})}));
+  scanSel=els.length?{url:c.toDataURL("image/jpeg",.85),w:c.width,h:c.height,els:els}:null;
   return t.replace(/\[\?\]|\s/g,"").length<3?"NOTEXT":t;
 }
 function scanLangChg(){try{localStorage.setItem("nb_scanlang",document.getElementById("scanLang").value)}catch(e){}if(scanSrc)runScan()}
+/* ---------- On-device Google ML Kit (APK only) ---------- */
+let mlP=null;
+function fixDigits(t){return t.replace(/[\u0966-\u096F]/g,ch=>String(ch.charCodeAt(0)-0x966))}
+function shrink(c,max){const k=Math.min(1,max/Math.max(c.width,c.height)),o=document.createElement("canvas");o.width=Math.max(1,Math.round(c.width*k));o.height=Math.max(1,Math.round(c.height*k));o.getContext("2d").drawImage(c,0,0,o.width,o.height);return o}
+function rotCanvas(c,deg){
+  const r=deg*Math.PI/180,sw=Math.abs(Math.sin(r)),cw=Math.abs(Math.cos(r)),w=Math.round(c.width*cw+c.height*sw),h=Math.round(c.width*sw+c.height*cw),o=document.createElement("canvas");
+  o.width=w;o.height=h;const x=o.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,w,h);x.translate(w/2,h/2);x.rotate(r);x.drawImage(c,-c.width/2,-c.height/2);return o;
+}
+function skewFromPts(xs,ys,w){
+  let best=0,bs=-1;
+  for(let a=-15;a<=15.01;a+=1){
+    const r=a*Math.PI/180,sn=Math.sin(r),cs=Math.cos(r),hist=new Float32Array(Math.ceil(w*2+xs.length?w*2+2000:0)),off=w+500;let k=0;
+    for(let i=0;i<xs.length;i++){const y=Math.round(xs[i]*sn+ys[i]*cs)+off;if(y>=0&&y<hist.length)hist[y]++}
+    for(let i=0;i<hist.length;i++)k+=hist[i]*hist[i];
+    if(k>bs){bs=k;best=a}
+  }
+  return best;
+}
+function bestSkew(c){
+  const s=shrink(c,500),w=s.width,h=s.height,d=s.getContext("2d").getImageData(0,0,w,h).data,g=new Uint8Array(w*h);let sum=0;
+  for(let i=0;i<w*h;i++){g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];sum+=g[i]}
+  const th=sum/(w*h)*.8,xs=[],ys=[];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(g[y*w+x]<th){xs.push(x-w/2);ys.push(y-h/2)}
+  return xs.length<50?0:skewFromPts(xs,ys,Math.max(w,h));
+}
+function flatten(c){
+  const w=c.width,h=c.height,d=c.getContext("2d").getImageData(0,0,w,h).data,g=new Float32Array(w*h),W=w+1;
+  for(let i=0;i<w*h;i++)g[i]=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+  const I=new Float64Array(W*(h+1));
+  for(let y=0;y<h;y++){let t=0;for(let x=0;x<w;x++){t+=g[y*w+x];I[(y+1)*W+x+1]=I[y*W+x+1]+t}}
+  const r=Math.max(10,Math.round(Math.min(w,h)/10)),o=document.createElement("canvas");o.width=w;o.height=h;
+  const ox=o.getContext("2d"),od=ox.createImageData(w,h);
+  for(let y=0;y<h;y++){const y0=Math.max(0,y-r),y1=Math.min(h,y+r+1);
+    for(let x=0;x<w;x++){const x0=Math.max(0,x-r),x1=Math.min(w,x+r+1),m=(I[y1*W+x1]-I[y0*W+x1]-I[y1*W+x0]+I[y0*W+x0])/((x1-x0)*(y1-y0)),q=g[y*w+x]/(m+1),v=Math.max(0,Math.min(255,(q-.55)/.4*255)),k=(y*w+x)*4;
+      od.data[k]=od.data[k+1]=od.data[k+2]=v;od.data[k+3]=255}}
+  ox.putImageData(od,0,0);return o;
+}
+function ocrScore(t){let n=0;(t||"").split(/\s+/).forEach(w=>{w=w.replace(/[^A-Za-z\u0900-\u097F0-9]/g,"");if((/^[A-Za-z]{3,}$/.test(w)&&new Set(w.toLowerCase()).size>=2)||/^[\u0900-\u097F]{2,}$/.test(w))n+=w.length});return n}
+let scanSel=null;
+async function mlRun(cv,lang,q){
+  const script=lang==="eng"?"latin":(lang==="hin"?"devanagari":"both");
+  const r=await mlP.recognize({image:cv.toDataURL("image/jpeg",q).split(",")[1],script:script}),dt=(r&&r.devanagari)||"",lt=(r&&r.latin)||"",de=(r&&r.dEl)||[],le=(r&&r.lEl)||[];
+  let useD=true;
+  if(script==="both"){const d=(dt.match(/[\u0900-\u097F]/g)||[]).length;useD=d>=8?true:!(lt.length>dt.length)}
+  else if(script==="latin")useD=false;
+  return useD?{text:dt,els:de}:{text:lt,els:le};
+}
+async function mlText(cv,lang,q){return (await mlRun(cv,lang,q)).text}
+async function scanMLKit(c,lang,st){
+  if(!mlP){
+    if(!(window.Capacitor&&Capacitor.registerPlugin))throw new Error("ML Kit works only in the installed app");
+    mlP=Capacitor.registerPlugin("MlKitOcr");
+  }
+  const say=m=>{if(st)st.innerHTML=ic("sparkles")+m};
+  c=shrink(c,2000);
+  const small=shrink(c,900);let bestDeg=0,bestSc=-1;
+  say("Finding photo direction...");
+  for(const deg of [0,90,180,270]){
+    const sc=ocrScore(await mlText(deg?rotCanvas(small,deg):small,lang,.8));
+    if(sc>bestSc){bestSc=sc;bestDeg=deg}
+    if(deg===0&&sc>=60)break;
+  }
+  let base=bestDeg?rotCanvas(c,bestDeg):c;
+  say("Straightening tilted writing...");
+  const ang=bestSkew(base);
+  if(Math.abs(ang)>=1.5)base=rotCanvas(base,ang);
+  say("Reading text (ML Kit)...");
+  let a=await mlRun(base,lang,.92);
+  say("Reading again with cleaned photo...");
+  try{const b=await mlRun(flatten(base),lang,.92);if(ocrScore(b.text)>ocrScore(a.text))a=b}catch(e){}
+  let t=a.text;
+  scanSel=(a.els&&a.els.length)?{url:base.toDataURL("image/jpeg",.85),w:base.width,h:base.height,els:a.els.map(e=>({t:fixDigits(e.t||""),l:e.l,tp:e.tp,r:e.r,b:e.b,ln:e.ln}))}:null;
+  t=fixDigits(t.split("\n").map(x=>x.replace(/\s+$/,"")).filter(x=>x.trim()).join("\n"));
+  return t.replace(/\s/g,"").length<3?"NOTEXT":t;
+}
+async function scanLocal(c){
+  const lang=lsGet("nb_scanlang")||"hin+eng",st=document.getElementById("scanSt");let mlErr="";
+  document.getElementById("scanLang").value=lang;
+  if(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()){
+    try{st.innerHTML=ic("sparkles")+"Reading with Google ML Kit (offline)...";return await scanMLKit(c,lang,st)}
+    catch(e){mlErr=String((e&&e.message)||e);st.innerHTML=ic("sparkles")+"ML Kit failed, trying Tesseract..."}
+  }
+  try{return await scanOffline(c)}
+  catch(e2){throw new Error((mlErr?"ML Kit: "+mlErr+" | ":"")+((e2&&e2.message)||e2))}
+}
 async function scanText(c){
   const mode=lsGet("nb_scanmode")||"auto",st=document.getElementById("scanSt"),b64=()=>c.toDataURL("image/jpeg",.85).split(",")[1];
   if(mode==="gemini")return scanAI(b64());
@@ -727,8 +824,65 @@ async function scanText(c){
     try{st.innerHTML=ic("sparkles")+"Gemini is reading the handwriting...";return await scanAI(b64())}
     catch(e){st.innerHTML=ic("sparkles")+"Gemini not available, using offline scanner..."}
   }
-  return scanOffline(c);
+  return scanLocal(c);
 }
+
+/* ---------- Lens-style word selection ---------- */
+let wsEls=[],wsSel=new Set(),wsW=1,wsH=1,wsDown=null;
+function openWordSel(){
+  const S=scanSel;if(!S||!S.els.length)return;
+  wsEls=S.els;wsSel=new Set();wsW=S.w;wsH=S.h;
+  document.getElementById("wsel").classList.add("open");
+  const mid=document.getElementById("wselMid"),box=document.getElementById("wselBox"),k=Math.min(mid.clientWidth/wsW,mid.clientHeight/wsH);
+  box.style.width=Math.round(wsW*k)+"px";box.style.height=Math.round(wsH*k)+"px";
+  box.innerHTML='<img src="'+S.url+'" style="width:100%;height:100%;display:block;pointer-events:none">'+wsEls.map((e,i)=>{const p=Math.max(2,(e.b-e.tp)*.08);return '<div class="wsw" id="ws'+i+'" style="left:'+((e.l-p)/wsW*100)+'%;top:'+((e.tp-p)/wsH*100)+'%;width:'+((e.r-e.l+2*p)/wsW*100)+'%;height:'+((e.b-e.tp+2*p)/wsH*100)+'%"></div>'}).join("")+'<div id="wselR" style="position:absolute;display:none;border:2px dashed #fff;background:rgba(255,255,255,.15)"></div>';
+  wsPaint();
+}
+function wsClose(){document.getElementById("wsel").classList.remove("open")}
+function wsPaint(){
+  wsEls.forEach((e,i)=>{const d=document.getElementById("ws"+i);if(d)d.classList.toggle("on",wsSel.has(i))});
+  document.getElementById("wselCnt").textContent=wsSel.size?wsSel.size+" word"+(wsSel.size>1?"s":"")+" selected":"No word selected";
+}
+function wsAll(){wsSel=new Set(wsEls.map((e,i)=>i));wsPaint()}
+function wsClear(){wsSel=new Set();wsPaint()}
+function wsText(){
+  const ids=[...wsSel].sort((a,b)=>a-b);let o="",pl=-1;
+  ids.forEach(i=>{const e=wsEls[i];if(pl>=0)o+=(e.ln!==pl?"\n":" ");o+=e.t;pl=e.ln});
+  return o;
+}
+async function wsCopy(){
+  const t=wsText();if(!t){toast("Select words first");return}
+  try{await navigator.clipboard.writeText(t)}catch(e){const ta=document.createElement("textarea");ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand("copy")}catch(_){}ta.remove()}
+  toast("Copied")
+}
+function wsUse(){
+  const t=wsText();if(!t){toast("Select words first");return}
+  document.getElementById("scanText").value=t;wsClose();toast("Selected text added to the note box")
+}
+(function(){
+  const box=document.getElementById("wselBox");
+  box.addEventListener("pointerdown",e=>{wsDown={x:e.clientX,y:e.clientY,r:box.getBoundingClientRect()};try{box.setPointerCapture(e.pointerId)}catch(_){}});
+  box.addEventListener("pointermove",e=>{
+    if(!wsDown)return;const R=document.getElementById("wselR"),r=wsDown.r;
+    if(!R||Math.hypot(e.clientX-wsDown.x,e.clientY-wsDown.y)<10)return;
+    R.style.display="block";R.style.left=(Math.min(wsDown.x,e.clientX)-r.left)+"px";R.style.top=(Math.min(wsDown.y,e.clientY)-r.top)+"px";
+    R.style.width=Math.abs(e.clientX-wsDown.x)+"px";R.style.height=Math.abs(e.clientY-wsDown.y)+"px";
+  });
+  box.addEventListener("pointerup",e=>{
+    if(!wsDown)return;const d=wsDown;wsDown=null;const R=document.getElementById("wselR");if(R)R.style.display="none";
+    const r=d.r,fx=wsW/r.width,fy=wsH/r.height;
+    if(Math.hypot(e.clientX-d.x,e.clientY-d.y)<10){
+      const x=(e.clientX-r.left)*fx,y=(e.clientY-r.top)*fy,p=14*fx;let hit=-1,bd=1e12;
+      wsEls.forEach((el,i)=>{if(x>=el.l-p&&x<=el.r+p&&y>=el.tp-p&&y<=el.b+p){const dd=Math.hypot(x-(el.l+el.r)/2,y-(el.tp+el.b)/2);if(dd<bd){bd=dd;hit=i}}});
+      if(hit>=0){if(wsSel.has(hit))wsSel.delete(hit);else wsSel.add(hit)}
+    }else{
+      const x0=(Math.min(d.x,e.clientX)-r.left)*fx,x1=(Math.max(d.x,e.clientX)-r.left)*fx,y0=(Math.min(d.y,e.clientY)-r.top)*fy,y1=(Math.max(d.y,e.clientY)-r.top)*fy;
+      wsEls.forEach((el,i)=>{if(el.r>=x0&&el.l<=x1&&el.b>=y0&&el.tp<=y1)wsSel.add(i)});
+    }
+    wsPaint();
+  });
+  box.addEventListener("pointercancel",()=>{wsDown=null});
+})();
 let scanSrc=null,scanRot=0;
 function drawScaled(img,deg){
   const sc=Math.min(1,1800/Math.max(img.width,img.height)),w=Math.round(img.width*sc),h=Math.round(img.height*sc),c=document.createElement("canvas"),r=deg%180!==0;
@@ -736,6 +890,7 @@ function drawScaled(img,deg){
   x.translate(c.width/2,c.height/2);x.rotate(deg*Math.PI/180);x.drawImage(img,-w/2,-h/2,w,h);return c;
 }
 async function runScan(){
+  scanSel=null;document.getElementById("scanSelRow").style.display="none";
   openScan(ic("sparkles")+"AI is reading the handwriting...");
   try{
     const c=drawScaled(scanSrc,scanRot);
@@ -746,6 +901,7 @@ async function runScan(){
     document.getElementById("scanTitle").value=title;document.getElementById("scanText").value=t;
     document.getElementById("scanSt").innerHTML=ic("check")+"Done reading. Fix any mistakes, then save";
     document.getElementById("scanForm").style.display="";
+    document.getElementById("scanSelRow").style.display=(scanSel&&scanSel.els.length)?"":"none";
   }catch(e){document.getElementById("scanSt").innerHTML=ic("alert")+esc(e.message||e)}
 }
 ["scanCam","scanGal"].forEach(id=>document.getElementById(id).addEventListener("change",async function(){
