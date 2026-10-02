@@ -1336,14 +1336,19 @@ function gemmaPick(q){
   const rel=live().map(n=>({n,h:offHits(n,toks)})).filter(x=>x.h>=2).sort((a,b)=>b.h-a.h).slice(0,3);
   return rel.length?{ids:rel.map(x=>x.n.id),rel,toks}:null;
 }
+function gemmaGeneral(q){return {ids:[],rel:[],toks:offTokens(q.toLowerCase()),general:true}}
 function gemmaSnip(n,toks,max){
   const lines=(n.text||"").split("\n").filter(x=>x.trim()),hit=lines.filter(l=>toks.some(t=>l.toLowerCase().includes(t))),s=(hit.length?hit:lines).join("\n");
   return s.length>max?s.slice(0,max)+"...":s;
 }
 function gemmaPrompt(q,gq){
   let ctx="";
-  gq.rel.forEach(x=>{const n=x.n;ctx+="["+fmt(createdOf(n))+"] "+(n.title||"Untitled")+"\n"+gemmaSnip(n,gq.toks,650)+"\n\n"});
-  return "<start_of_turn>user\nYou are the assistant of a private diary. Answer ONLY from the diary notes below. Reply in the same language as the question, in at most 5 short lines. If the notes do not contain the answer, say so.\n\nDIARY NOTES:\n"+ctx.slice(0,2000)+"\nQUESTION: "+q.slice(0,300)+"<end_of_turn>\n<start_of_turn>model\n";
+  gq.rel.forEach(x=>{const n=x.n;ctx+="["+fmt(createdOf(n))+"] "+(n.title||"Untitled")+"\n"+gemmaSnip(n,gq.toks,gq.general?400:550)+"\n\n"});
+  const rules="You are an offline study assistant for a NEET-UG student. Reply in the same language as the question (Hindi/Hinglish/English), in at most 7 short lines, simple words. "+
+   "First use the NOTES below if they help (notes with 'Ans' are previous year questions with the correct answer). "+
+   "If the notes do not contain the answer, answer from your own knowledge of NEET Physics, Chemistry, Biology (NCERT concepts, formulas, syllabus, study strategy) and start with 'Not from your diary:'. "+
+   "Never guess dates, cut-offs, ranks, results, seat numbers or news: say these need internet. If you are not sure, say you are not sure.";
+  return "<start_of_turn>user\n"+rules+(ctx?"\n\nNOTES:\n"+ctx.slice(0,1500):"")+"\nQUESTION: "+q.slice(0,300)+"<end_of_turn>\n<start_of_turn>model\n";
 }
 async function gemmaAsk(q,gq){
   const r=await Promise.race([gemmaP().generate({prompt:gemmaPrompt(q,gq)}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("Offline AI took too long")),180000))]);
@@ -1353,7 +1358,8 @@ gemRefresh();
 async function sendChat(){
   const inp=document.getElementById("cinput");
   let q=inp.value.trim();if(!q&&!chatAtt)return;if(!q)q="Make a clean note from this photo/file";
-  const key=getKey(),rt=routeChat(q,!!chatAtt),gq=(!chatAtt&&(rt.mode==="online"||rt.mode==="stop")&&gemmaOn())?gemmaPick(q):null;
+  const key=getKey(),rt=routeChat(q,!!chatAtt);let gq=null;
+  if(!chatAtt&&(rt.mode==="online"||rt.mode==="stop")&&gemmaOn()){gq=gemmaPick(q);if(!gq&&(!navigator.onLine||!key))gq=gemmaGeneral(q)}
   if(!key&&rt.mode==="online"&&!gq){document.getElementById("cset").classList.add("open");toast("Add your API key first");return}
   const att=chatAtt,shown=(att?"Attached: "+att.name+"\n":"")+q;chatAtt=null;renderAtt();
   inp.value="";addMsg("u",shown);
@@ -1364,8 +1370,8 @@ async function sendChat(){
     try{
       const a=await gemmaAsk(q,gq);
       if(!a)throw new Error("Empty answer");
-      wait.innerHTML=md(a)+'<div class="src">Offline AI (Gemma 3 1B) · answered on your phone from your diary, nothing was sent online</div>';
-      addOpenBtns(wait,gq.ids);history.push({role:"model",parts:[{text:a}]});saveChat();
+      wait.innerHTML=md(a)+'<div class="src">'+(gq.rel.length?"Offline AI (Gemma 3 1B) · answered on your phone from your notes, nothing was sent online":"Offline AI (Gemma 3 1B) · general NEET answer from the small model, not from your diary. Verify important facts. Nothing was sent online")+'</div>';
+      if(gq.ids.length)addOpenBtns(wait,gq.ids);history.push({role:"model",parts:[{text:a}]});saveChat();
       const bx1=document.getElementById("msgs");bx1.scrollTop=bx1.scrollHeight;return;
     }catch(e){
       toast("Offline AI: "+String((e&&e.message)||e).slice(0,120));
