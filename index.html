@@ -207,7 +207,7 @@ html.dark .chips button{background:#1d222b;color:#e6e8ec;border-color:#2a2f3a}
 html.dark .noteItem:hover,html.dark .noteItem.cur{background:#222834}
 html.dark .noteItem{border-color:#2a2f3a}
 html.dark .sheet{background:#1d222b}html.dark .sheet button{color:#e6e8ec}
-@media(min-width:700px){
+@media(min-width:700px) and (min-height:700px){
   .app{max-width:520px;margin:auto;box-shadow:0 0 20px #bbb}
   body{background:#dfe3e8}
 }
@@ -277,6 +277,15 @@ html.dark .mval{color:#e6e8ec}
 .liveclk{display:inline-flex;align-items:center;gap:5px;margin:3px 0 2px;padding:2px 9px 2px 7px;border-radius:999px;background:rgba(21,101,168,.09);color:#1565a8;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px}
 .liveclk svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
+
+.app{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+@media (orientation:landscape) and (max-height:600px){
+  .topbar,.chead{height:calc(46px + env(safe-area-inset-top,0px));padding-top:calc(4px + env(safe-area-inset-top,0px))}
+  .bottom{height:calc(54px + env(safe-area-inset-bottom,0px));padding-bottom:calc(6px + env(safe-area-inset-bottom,0px))}
+  .bottom .save{min-width:40%}
+  .page{padding-bottom:calc(70px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+}
 </style>
 <link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="theme-color" content="#1f6feb">
 <style>.tbar{display:flex;gap:8px;margin:0 0 12px;flex-wrap:wrap}.tbar button{border:1px solid #cfd8e3;background:#f4f7fb;color:#1f6feb;border-radius:14px;padding:6px 12px;font-size:13px;font-weight:600}html.dark .tbar button{background:#222834;border-color:#2a2f3a}.sheet{max-height:calc(100dvh - 70px);overflow:auto}</style>
@@ -1178,35 +1187,52 @@ function offSnippet(n,toks,span){
 }
 function localAnswer(q){
   const ql=q.toLowerCase(),hi=/[\u0900-\u097F]/.test(q),hl=!hi&&OFF_HINGLISH.test(ql),T=(e,h,l)=>hi?h:(hl&&l?l:e),L=live();
-  if(!L.length)return{text:T("Your diary has no notes yet.","आपकी डायरी में अभी कोई नोट नहीं है।","Aapki diary mein abhi koi note nahi hai."),ids:[],found:false};
+  if(!L.length)return{text:T("Your diary has no notes yet. Once you add a note, I can answer questions about it.","आपकी डायरी में अभी कोई नोट नहीं है। नोट जोड़ने के बाद मैं उनके बारे में आपके सवालों के जवाब दे सकूँगा।","Aapki diary mein abhi koi note nahi hai. Note add karne ke baad main unke baare mein aapke sawalon ke jawab de sakunga."),ids:[],found:false};
   const dr=offRange(ql),toks=offTokens(ql),pool=dr?L.filter(n=>offInRange(n,dr)):L;
   if(OFF_COUNT.test(ql)){
     const m=toks.length?pool.filter(n=>offScore(n,toks)>0):pool;
-    return{text:T("You have "+m.length+" note"+(m.length===1?"":"s")+(dr?" in that period":(toks.length?" matching your question":""))+" (total in diary: "+L.length+").",
-                  m.length+" नोट"+(dr?" उस अवधि में":(toks.length?" आपके सवाल से मिलते हैं":""))+" हैं (डायरी में कुल: "+L.length+")।",
-                  "Aapke paas "+m.length+" note"+(dr?" us period mein":(toks.length?" is sawal se match karte":""))+" hain (diary mein kul: "+L.length+")."),ids:[],found:true};
+    return{text:T("Your diary contains "+m.length+" note"+(m.length===1?"":"s")+(dr?" in that period":(toks.length?" matching your question":""))+" (total in diary: "+L.length+").",
+                  "आपकी डायरी में "+m.length+" नोट"+(dr?" उस अवधि में":(toks.length?" आपके सवाल से मेल खाते हैं":""))+" हैं (डायरी में कुल: "+L.length+")।",
+                  "Aapki diary mein "+m.length+" note"+(dr?" us avadhi mein":(toks.length?" aapke sawal se mel khate"  :""))+" hain (diary mein kul: "+L.length+")."),ids:[],found:true};
   }
   if(OFF_TASK.test(ql)){
     const rx=/^\s*(?:[-*•]\s*)?(?:\[\s?\]|☐|to-?do\b|task\b|काम\b|reminder\b)\s*[:\-]?\s*(.*)/i,out=[],ids=[];
     pool.slice().sort((a,b)=>offTime(b)-offTime(a)).forEach(n=>(n.text||"").split("\n").forEach(ln=>{
-      const m=rx.exec(ln);if(m&&m[1].trim()&&out.length<30){out.push("• "+m[1].trim()+" ("+(n.title||T("Untitled","बिना शीर्षक"))+")");if(!ids.includes(n.id))ids.push(n.id)}}));
-    if(out.length)return{text:T("Tasks found in your diary:","आपकी डायरी में ये काम मिले:","Aapki diary mein ye kaam mile:")+"\n\n"+out.join("\n"),ids,found:true};
+      const m=rx.exec(ln);if(m&&m[1].trim()&&out.length<30){out.push("• "+m[1].trim()+" ("+(n.title||T("Untitled","बिना शीर्षक","Bina title"))+")");if(!ids.includes(n.id))ids.push(n.id)}}));
+    if(out.length)return{text:T("You have "+out.length+" task"+(out.length===1?"":"s")+" listed in your diary:","आपकी डायरी में "+out.length+" काम दर्ज हैं:","Aapki diary mein "+out.length+" kaam darj hain:")+"\n\n"+out.join("\n"),ids,found:true};
+    if(!toks.length)return{text:T("I couldn't find any tasks in your diary.\n\nTo track tasks, write them in a note as “[ ] task name” or “To-do: task name”, and I will list them here.",
+      "आपकी डायरी में कोई काम दर्ज नहीं मिला।\n\nकाम ट्रैक करने के लिए नोट में “[ ] काम का नाम” या “To-do: काम का नाम” लिखें, मैं उन्हें यहाँ सूचीबद्ध कर दूँगा।",
+      "Aapki diary mein koi kaam darj nahi mila.\n\nKaam track karne ke liye note mein “[ ] kaam ka naam” ya “To-do: kaam ka naam” likhein, main unhe yahan list kar dunga."),ids:[],found:true};
   }
   let res=pool.map(n=>({n,s:offScore(n,toks),h:offHits(n,toks)}));
   if(toks.length){
     res=res.filter(x=>x.h>0);
     const mh=res.reduce((m,x)=>Math.max(m,x.h),0);
-    res=res.filter(x=>x.h>=Math.ceil(mh/2));   /* sirf wo notes jo sawal ke zyada shabdon se milte hain */
+    res=res.filter(x=>x.h>=Math.ceil(mh/2));
   }
   res.sort((a,b)=>b.h-a.h||b.s-a.s||offTime(b.n)-offTime(a.n));
   const seen=new Set();
-  res=res.filter(x=>{const k=(x.n.text||"").replace(/\s+/g,"").slice(0,300);if(k&&seen.has(k))return false;seen.add(k);return true});   /* ek jaise duplicate notes ek hi baar */
+  res=res.filter(x=>{const k=(x.n.text||"").replace(/\s+/g,"").slice(0,300);if(k&&seen.has(k))return false;seen.add(k);return true});
   if(!toks.length&&!dr)res=res.slice(0,10);
-  if(!res.length)return{text:T("I couldn't find this in your diary.","यह जानकारी आपकी डायरी में नहीं मिली।","Ye jaankari aapki diary mein nahi mili."),ids:[],found:false};
-  const n=res.length,show=res.slice(0,3);
-  let t=T("From your diary:","आपकी डायरी से:","Aapki diary ke hisaab se:")+"\n\n";
-  t+=show.map(x=>"**"+(x.n.title||T("Untitled","बिना शीर्षक"))+"** — "+fmt(createdOf(x.n))+"\n"+offSnippet(x.n,toks)).join("\n\n");
-  if(n>show.length)t+="\n\n"+T("…and "+(n-show.length)+" more.","…और "+(n-show.length)+" नोट।","…aur "+(n-show.length)+" note.");
+  if(!res.length)return{text:T("I couldn't find anything about this in your diary.\n\nPlease try rephrasing your question or use a keyword from the note.","इस बारे में आपकी डायरी में कोई जानकारी नहीं मिली।\n\nकृपया सवाल दूसरे शब्दों में पूछें या नोट का कोई मुख्य शब्द लिखें।","Is baare mein aapki diary mein koi jaankari nahi mili.\n\nKripya sawal doosre shabdon mein poochhein ya note ka koi mukhya shabd likhein."),ids:[],found:false};
+  const n=res.length,show=res.slice(0,3),s2=n===1?"":"s",detail=!!dr||!toks.length,span=detail?500:240;
+  const per=/आज|today|\baaj\b/.test(ql)?T("today","आज","aaj"):/कल|yesterday|\bkal\b/.test(ql)?T("yesterday","कल","kal"):/हफ़्ते|हफ्ते|सप्ताह|week/.test(ql)?T("in the last 7 days","पिछले 7 दिनों में","pichhle 7 din mein"):T("in the last month","पिछले महीने में","pichhle mahine mein");
+  let intro;
+  if(dr)intro=T("You have "+n+" note"+s2+" "+per+". Here are the details:",per+" आपके "+n+" नोट हैं। विवरण इस प्रकार है:",per+" aapke "+n+" note hain. Vivaran is prakar hai:");
+  else if(toks.length)intro=T("I found "+n+" note"+s2+" related to your question:","आपके सवाल से जुड़े "+n+" नोट मिले:","Aapke sawal se jude "+n+" note mile:");
+  else intro=T("Here are your most recent notes:","ये आपके सबसे हाल के नोट हैं:","Ye aapke sabse haal ke note hain:");
+  intro=intro.charAt(0).toUpperCase()+intro.slice(1);
+  const body=x=>{
+    const t=(x.n.text||"").trim();
+    if(!t){const m=(x.n.media||[]).length;return m?T("(No written text — "+m+" attachment"+(m>1?"s":"")+")","(कोई लिखित पाठ नहीं — "+m+" अटैचमेंट)","(Koi likhit text nahi — "+m+" attachment)"):T("(This note is empty)","(यह नोट खाली है)","(Ye note khali hai)")}
+    if(!detail)return offSnippet(x.n,toks,span);
+    const c=t.replace(/[ \t]+/g," ").replace(/\n{3,}/g,"\n\n");
+    if(c.length<=span)return c;
+    const i=c.lastIndexOf(" ",span);return c.slice(0,i>span*.6?i:span)+"…";
+  };
+  let t=intro+"\n\n"+show.map(x=>"**"+(x.n.title||T("Untitled","बिना शीर्षक","Bina title"))+"** · "+fmt(createdOf(x.n))+"\n"+body(x)).join("\n\n");
+  if(n>show.length){const r=n-show.length;t+="\n\n"+T("There "+(r===1?"is 1 more note":"are "+r+" more notes")+". Ask about a specific topic to narrow it down.","और "+r+" नोट हैं। किसी विशेष विषय के बारे में पूछकर खोज सीमित करें।","Aur "+r+" note hain. Kisi vishesh vishay ke baare mein poochhkar khoj seemit karein.")}
+  t+="\n\n"+T("Tap a note below to open it in full.","पूरा नोट खोलने के लिए नीचे दिए गए बटन पर टैप करें।","Poora note kholne ke liye neeche diye gaye button par tap karein.");
   return{text:t,ids:show.map(x=>x.n.id),found:true};
 }
 /* ---------- Chhota, seedha jawab: sirf wo hissa jo poochha gaya ---------- */
@@ -1250,45 +1276,47 @@ function offFacts(toks,ql){
     pick.push(x);break}
   return pick;
 }
-function offSmallTalk(ql,hi){
-  const s=ql.replace(/[!.,?।]+/g," ").replace(/\s+/g," ").trim(),T=(h,l)=>hi?h:l;
+function offSmallTalk(ql,hi,hl){
+  const s=ql.replace(/[!.,?।]+/g," ").replace(/\s+/g," ").trim(),
+    hg=hl||/^(?:namaste|namaskar|ram ram|shukriya|dhanyavad|dhanyawad|kaise|kya haal|tum |aap |tata|alvida)/.test(s),
+    T=(e,h,l)=>hi?h:(hg&&l?l:e);
   if(/^(?:hi+|hello+|hey+|hii+|namaste|namaskar|ram ram|good morning|good afternoon|good evening|नमस्ते|हेलो|हैलो|हाय)(?: (?:there|ji|sir|dost|bhai))?$/.test(s))
-    return T("नमस्ते! मैंने आपकी डायरी पढ़ ली है। नोट्स, मार्क्स, काम या तारीख़ के बारे में पूछिए।","Namaste! Maine aapki diary padh li hai. Notes, marks, kaam ya date ke baare mein poochh sakte ho.");
+    return T("Hello! I'm your Diary AI assistant. I can help you find notes, tasks, marks and dates from your diary. What would you like to know?","नमस्ते! मैं आपका डायरी AI सहायक हूँ। मैं आपकी डायरी से नोट्स, काम, अंक और तारीख़ें खोजने में मदद कर सकता हूँ। आप क्या जानना चाहेंगे?","Namaste! Main aapka Diary AI sahayak hoon. Main aapki diary se notes, kaam, marks aur tareekhein khojne mein madad kar sakta hoon. Aap kya jaanna chahenge?");
   if(/^(?:kaise ho|kaise hain aap|aap kaise ho|tum kaise ho|kya haal hai|kya haal hain|how are you|how r u|क्या हाल है|कैसे हो)$/.test(s))
-    return T("मैं ठीक हूँ, धन्यवाद! बताइए, डायरी में क्या देखना है?","Main theek hun, shukriya! Bataiye, diary mein kya dekhna hai?");
+    return T("I'm doing well, thank you for asking. How can I help you with your diary today?","मैं ठीक हूँ, पूछने के लिए धन्यवाद। आज मैं आपकी डायरी में किस तरह मदद कर सकता हूँ?","Main theek hoon, poochhne ke liye dhanyavad. Aaj main aapki diary mein kis tarah madad kar sakta hoon?");
   if(/^(?:thanks|thank you|thx|thanks a lot|ok thanks|shukriya|dhanyavad|dhanyawad|धन्यवाद|शुक्रिया)$/.test(s))
-    return T("कोई बात नहीं!","Koi baat nahi! Aur kuch poochhna ho to bataiye.");
+    return T("You're welcome! Let me know if you need anything else.","आपका स्वागत है! कुछ और जानना हो तो बताइए।","Aapka swagat hai! Kuch aur jaanna ho to bataiye.");
   if(/^(?:bye|goodbye|good bye|ok bye|tata|alvida|good night)$/.test(s))
-    return T("फिर मिलेंगे!","Phir milte hain! Apna dhyan rakhna.");
+    return T("Goodbye! Take care.","अलविदा! अपना ध्यान रखिए।","Alvida! Apna dhyan rakhiye.");
   if(/^(?:who are you|what can you do|tum kaun ho|aap kaun ho|tum kya kar sakte ho|aap kya kar sakte ho)$/.test(s))
-    return T("मैं आपकी डायरी का AI हूँ। नोट्स से जवाब देता हूँ (बिना इंटरनेट), और ज़रूरत हो तो इंटरनेट से भी।","Main aapki diary ka AI hun. Pehle aapke notes se jawab deta hun (bina internet), aur zaroorat ho to internet se bhi.");
+    return T("I'm Diary AI, your personal diary assistant. I answer from your notes without using the internet, and I can use the internet for questions that go beyond your diary.","मैं डायरी AI हूँ, आपका निजी डायरी सहायक। मैं इंटरनेट के बिना आपके नोट्स से जवाब देता हूँ, और डायरी से बाहर के सवालों के लिए इंटरनेट का उपयोग कर सकता हूँ।","Main Diary AI hoon, aapka niji diary sahayak. Main internet ke bina aapke notes se jawab deta hoon, aur diary se bahar ke sawalon ke liye internet ka upyog kar sakta hoon.");
   return null;
 }
 function offToday(ql,hi,hl){
   const T=(e,h,l)=>hi?h:(hl?l:e),L=live(),rx=/^\s*(?:[-*•]\s*)?(?:\[\s?\]|☐|to-?do\b|task\b|काम\b|reminder\b)\s*[:\-]?\s*(.*)/i,out=[],ids=[];
   L.slice().sort((a,b)=>offTime(b)-offTime(a)).forEach(n=>(n.text||"").split("\n").forEach(ln=>{
     const m=rx.exec(ln);if(m&&m[1].trim()&&out.length<10){out.push("• "+m[1].trim());if(!ids.includes(n.id))ids.push(n.id)}}));
-  if(out.length)return{found:true,ids,text:T("Pending tasks in your diary:","आपकी डायरी में ये काम बाकी हैं:","Aapki diary mein ye kaam baaki hain:")+"\n\n"+out.join("\n")};
+  if(out.length)return{found:true,ids,text:T("Here are the pending tasks in your diary:","आपकी डायरी में ये काम बाकी हैं:","Aapki diary mein ye kaam baaki hain:")+"\n\n"+out.join("\n")};
   return{found:false};
 }
 function routeChat(q,hasAtt){
   if(hasAtt||lsGet("nb_offline")==="off")return{mode:"online"};
   const ql=q.toLowerCase(),hi=/[\u0900-\u097F]/.test(q),hl=!hi&&OFF_HINGLISH.test(ql),online=navigator.onLine,dr=offRange(ql),toks=offTokens(ql);
-  const stopMsg=(extra)=>({mode:"stop",ids:[],text:hi?"यह आपकी डायरी में नहीं मिला, और इस सवाल के लिए इंटरनेट चाहिए। इंटरनेट चालू करके फिर पूछें।":hl?"Ye aapki diary mein nahi mila, aur is sawal ke liye internet chahiye. Internet on karke phir poochhein.":"I couldn't find this in your diary, and this question needs internet. Please connect and ask again."});
+  const stopMsg=(extra)=>({mode:"stop",ids:[],text:hi?"यह जानकारी आपकी डायरी में नहीं मिली, और इस सवाल का उत्तर देने के लिए इंटरनेट आवश्यक है। कृपया इंटरनेट चालू करके दोबारा पूछें।":hl?"Ye jaankari aapki diary mein nahi mili, aur is sawal ka uttar dene ke liye internet zaroori hai. Kripya internet chalu karke dobara poochhein.":"I couldn't find this in your diary, and answering it requires an internet connection. Please connect to the internet and ask again."});
   /* 1) Aam batcheet (Hi, kaise ho, thanks) - bina internet */
-  const st=offSmallTalk(ql,hi);if(st)return{mode:"chat",text:st,ids:[]};
+  const st=offSmallTalk(ql,hi,hl);if(st)return{mode:"chat",text:st,ids:[]};
   /* 2) "Aaj mujhe kya karna chahiye" - pehle diary ke kaam, phir internet */
   if(OFF_TODAY.test(ql)){
     const t=offToday(ql,hi,hl);if(t.found)return Object.assign({mode:"local"},t);
     if(online)return{mode:"online"};
-    return{mode:"local",ids:[],text:hi?"आज के लिए डायरी में कोई काम नहीं लिखा है। इंटरनेट चालू हो तो मैं आज का प्लान बना दूँगा।":hl?"Aaj ke liye diary mein koi kaam nahi likha hai. Internet on ho to main aaj ka plan bana dunga.":"No task for today is written in your diary. With internet on, I can make today's plan."};
+    return{mode:"local",ids:[],text:hi?"आज के लिए आपकी डायरी में कोई काम दर्ज नहीं है। इंटरनेट चालू होने पर मैं आज की योजना तैयार कर सकता हूँ।":hl?"Aaj ke liye aapki diary mein koi kaam darj nahi hai. Internet chalu hone par main aaj ki yojana taiyaar kar sakta hoon.":"No tasks are listed for today in your diary. With an internet connection, I can prepare a plan for today."};
   }
   /* 3) Naya plan/likhna/samjhana: ye banane ke liye internet chahiye */
   if(OFF_GEN.test(ql)){
     if(online)return{mode:"online"};
     const rel=live().map(n=>({n,h:offHits(n,toks)})).filter(x=>x.h>=2).sort((a,b)=>b.h-a.h).slice(0,3);
-    return{mode:"stop",ids:rel.map(x=>x.n.id),text:(hi?"यह नया जवाब/प्लान बनाने के लिए इंटरनेट चाहिए। इंटरनेट चालू करके फिर पूछें।":hl?"Ye naya jawab/plan banane ke liye internet chahiye. Internet on karke phir poochhein.":"Creating something new needs internet. Please connect and ask again.")+
-      (rel.length?(hi?"\n\nइस विषय पर आपकी डायरी के नोट:":hl?"\n\nIs topic par aapki diary ke note:":"\n\nNotes in your diary on this topic:"):"")};
+    return{mode:"stop",ids:rel.map(x=>x.n.id),text:(hi?"नया उत्तर या योजना तैयार करने के लिए इंटरनेट आवश्यक है। कृपया इंटरनेट चालू करके दोबारा पूछें।":hl?"Naya uttar ya yojana taiyaar karne ke liye internet zaroori hai. Kripya internet chalu karke dobara poochhein.":"Generating new content requires an internet connection. Please connect to the internet and ask again.")+
+      (rel.length?(hi?"\n\nइस विषय पर आपकी डायरी के नोट:":hl?"\n\nIs vishay par aapki diary ke note:":"\n\nRelated notes in your diary:"):"")};
   }
   /* 4) Ginti / kaam / tareekh / summary: poori suchi */
   if(OFF_COUNT.test(ql)||OFF_TASK.test(ql)||dr||OFF_LISTQ.test(ql)){
@@ -1298,7 +1326,7 @@ function routeChat(q,hasAtt){
   const f=offFacts(toks,ql);
   if(f){
     const ans=f.map(x=>offYou(offCut(x.c,200))).join("\n"),n=f[0].n;
-    return{mode:"local",ids:[n.id],text:ans+"\n\n("+(n.title||(hi?"बिना शीर्षक":"Untitled"))+" — "+fmt(createdOf(n))+")"};
+    return{mode:"local",ids:[n.id],text:ans+"\n\n*"+(hi?"स्रोत":"Source")+": "+(n.title||(hi?"बिना शीर्षक":"Untitled"))+" · "+fmt(createdOf(n))+"*"};
   }
   /* 6) "notes/diary" kaha ho par exact jawab na mila: suchi dikhao */
   if(OFF_DIARY.test(ql)){const a=localAnswer(q);if(a.found)return Object.assign({mode:"local"},a)}
@@ -1344,7 +1372,7 @@ function gemmaSnip(n,toks,max){
 function gemmaPrompt(q,gq){
   let ctx="";
   gq.rel.forEach(x=>{const n=x.n;ctx+="["+fmt(createdOf(n))+"] "+(n.title||"Untitled")+"\n"+gemmaSnip(n,gq.toks,gq.general?400:550)+"\n\n"});
-  const rules="You are an offline study assistant for a NEET-UG student. Reply in the same language as the question (Hindi/Hinglish/English), in at most 7 short lines, simple words. "+
+  const rules="You are a professional offline study assistant for a NEET-UG student. Reply in the same language as the question (Hindi/Hinglish/English). Use a polite, professional tone and clear, complete sentences. Begin with the direct answer, then add short bullet points only if they help. Keep it within 8 lines. No slang, no filler, no emojis. "+
    "First use the NOTES below if they help (notes with 'Ans' are previous year questions with the correct answer). "+
    "If the notes do not contain the answer, answer from your own knowledge of NEET Physics, Chemistry, Biology (NCERT concepts, formulas, syllabus, study strategy) and start with 'Not from your diary:'. "+
    "Never guess dates, cut-offs, ranks, results, seat numbers or news: say these need internet. If you are not sure, say you are not sure.";
@@ -1380,12 +1408,12 @@ async function sendChat(){
     }
   }
   if(rt.mode!=="online"){
-    wait.innerHTML=md(rt.text)+(rt.mode==="local"?'<div class="src">Offline answer · from your diary, nothing was sent online</div>':"");
+    wait.innerHTML=md(rt.text)+(rt.mode==="local"?'<div class="src">Answered offline from your diary · nothing was sent online</div>':"");
     if(rt.ids&&rt.ids.length)addOpenBtns(wait,rt.ids);
     history.push({role:"model",parts:[{text:rt.text}]});saveChat();
     const bx0=document.getElementById("msgs");bx0.scrollTop=bx0.scrollHeight;return;
   }
-  const sys="You are the AI assistant for the user's private diary and also an expert NEET-UG guide. Reply in the same language the user asks in (Hindi/Hinglish/English). Keep answers short and easy to read on a phone.\n\n"+
+  const sys="You are the AI assistant for the user's private diary and also an expert NEET-UG guide. Reply in the same language the user asks in (Hindi/Hinglish/English). Keep answers short and easy to read on a phone.\n\nTone and style: respond like a professional AI assistant. Begin with a direct answer, use clear complete sentences, a polite and neutral tone, and short bullet points or numbered steps where they help. No slang, no filler, no emojis, and never cut a sentence or list halfway.\n\n"+
    "Task 1 (Diary): When asked about the diary, answer from the notes given below, mentioning their dates; clearly say so if something is not in the diary.\n"+
    "Task 2 (NEET and knowledge): Answer every NEET-related question in full: syllabus, exam pattern, marking, cut-offs, marks vs rank, counselling (MCC and state), seat matrix, colleges, reservation, dates, results, notifications, latest news, preparation strategy, and Physics/Chemistry/Biology concepts and previous years' questions. For changing information such as cut-offs, dates and news, use Google Search and give the latest facts.\n"+
    "Never say you are limited to the diary or cannot fetch information from Google. If a figure cannot be confirmed, do not guess; say so clearly and suggest nta.ac.in or mcc.nic.in. Where the diary and NEET connect (for example their own marks or preparation), combine both in your advice.\n\n"+
