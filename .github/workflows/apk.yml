@@ -29,6 +29,13 @@ jobs:
           npx cap add android
           npx cap sync android
 
+      - name: ML Kit plugin
+        run: |
+          mkdir -p android/app/src/main/java/com/didi/diary
+          cp MlKitOcrPlugin.java MainActivity.java android/app/src/main/java/com/didi/diary/
+          sed -i '/^dependencies {/a\    implementation "com.google.mlkit:text-recognition:16.0.1"\n    implementation "com.google.mlkit:text-recognition-devanagari:16.0.1"' android/app/build.gradle
+          grep -n "mlkit" android/app/build.gradle
+
       - name: Camera permission and app icon
         run: |
           sed -i 's#<application#<uses-permission android:name="android.permission.CAMERA" />\n    <application#' android/app/src/main/AndroidManifest.xml
@@ -47,3 +54,4 @@ jobs:
         with:
           name: Didi-ki-Diary-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+          
