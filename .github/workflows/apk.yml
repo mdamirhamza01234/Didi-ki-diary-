@@ -29,12 +29,13 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: ML Kit plugin
+      - name: ML Kit and Gemma plugins
         run: |
           mkdir -p android/app/src/main/java/com/didi/diary
-          cp MlKitOcrPlugin.java MainActivity.java android/app/src/main/java/com/didi/diary/
-          sed -i '/^dependencies {/a\    implementation "com.google.mlkit:text-recognition:16.0.1"\n    implementation "com.google.mlkit:text-recognition-devanagari:16.0.1"' android/app/build.gradle
-          grep -n "mlkit" android/app/build.gradle
+          cp MlKitOcrPlugin.java GemmaPlugin.java MainActivity.java android/app/src/main/java/com/didi/diary/
+          sed -i "s/minSdkVersion = 22/minSdkVersion = 24/" android/variables.gradle
+          sed -i '/^dependencies {/a\    implementation "com.google.mlkit:text-recognition:16.0.1"\n    implementation "com.google.mlkit:text-recognition-devanagari:16.0.1"\n    implementation "com.google.mediapipe:tasks-genai:0.10.24"' android/app/build.gradle
+          grep -n "mlkit\|mediapipe" android/app/build.gradle; grep -n "minSdk" android/variables.gradle
 
       - name: Camera permission and app icon
         run: |
