@@ -318,7 +318,12 @@ html.dark .liveclk{background:rgba(110,168,255,.14);color:#6ea8ff}
   <div class="cset" id="cset">
     Gemini API Key
     <input id="apiKey" type="password" placeholder="Paste your API key here" autocomplete="off">
-    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br><label>Handwriting scan mode<select id="scanMode" style="width:100%;padding:10px;font-size:15px;margin:6px 0 10px"><option value="auto">Auto: Gemini when online, ML Kit offline</option><option value="offline">Offline only (ML Kit, no internet needed)</option><option value="gemini">Gemini only</option></select></label><br><button onclick="saveSet()">Save</button>
+    <div style="font-size:12px;color:#c62828;margin-bottom:8px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg>When you ask in chat, relevant notes are sent to Google Gemini.</div><label><input type="checkbox" id="ctxOn" checked>Send diary to Gemini for answers (only notes relevant to the question)</label><br><label><input type="checkbox" id="offOn" checked>Answer diary questions offline (no internet, no key needed)</label><br>
+    <div style="margin:10px 0;padding:10px;border:1px solid #ccd3dc;border-radius:10px"><b>Offline AI (Gemma 3 1B)</b>
+      <div id="gemSt" style="font-size:13px;margin:6px 0">Checking...</div>
+      <label><input type="checkbox" id="gemOn" checked>Use offline AI for diary questions</label>
+      <div class="srow"><button type="button" onclick="gemPick()">Select model file</button><button type="button" style="background:#eef1f5;color:#222" onclick="gemRemove()">Remove</button></div>
+      <small>One time: download gemma3-1b-it-int4.task (about 0.5 GB) from Hugging Face (litert-community/Gemma3-1B-IT), then select it here.</small></div><label>Handwriting scan mode<select id="scanMode" style="width:100%;padding:10px;font-size:15px;margin:6px 0 10px"><option value="auto">Auto: Gemini when online, ML Kit offline</option><option value="offline">Offline only (ML Kit, no internet needed)</option><option value="gemini">Gemini only</option></select></label><br><button onclick="saveSet()">Save</button>
     <button style="background:#eee;color:#333" onclick="clearChat()">Clear chat</button>
   </div>
   <div class="msgs" id="msgs"></div>
@@ -1012,7 +1017,7 @@ function restoreChat(){history.forEach(h=>{const d=addMsg(h.role==="user"?"u":"a
 function lsGet(k){try{return localStorage.getItem(k)||""}catch(e){return""}}
 function openChat(){
   saveSilently();
-  document.getElementById("apiKey").value=DEFAULT_KEY.trim()?"":lsGet(CK);document.getElementById("ctxOn").checked=lsGet("nb_ctx")!=="off";document.getElementById("offOn").checked=lsGet("nb_offline")!=="off";document.getElementById("scanMode").value=lsGet("nb_scanmode")||"auto";
+  document.getElementById("apiKey").value=DEFAULT_KEY.trim()?"":lsGet(CK);document.getElementById("ctxOn").checked=lsGet("nb_ctx")!=="off";document.getElementById("offOn").checked=lsGet("nb_offline")!=="off";document.getElementById("gemOn").checked=lsGet("nb_gemma")!=="off";gemRefresh();document.getElementById("scanMode").value=lsGet("nb_scanmode")||"auto";
   
   document.getElementById("chat").classList.add("open");
   if(!getKey())document.getElementById("cset").classList.add("open");
@@ -1023,7 +1028,7 @@ function closeChat(){document.getElementById("chat").classList.remove("open")}
 function toggleSet(){document.getElementById("cset").classList.toggle("open")}
 function saveSet(){
   try{
-    localStorage.setItem(CK,document.getElementById("apiKey").value.trim());localStorage.removeItem("nb_models");localStorage.setItem("nb_ctx",document.getElementById("ctxOn").checked?"on":"off");localStorage.setItem("nb_offline",document.getElementById("offOn").checked?"on":"off");localStorage.setItem("nb_scanmode",document.getElementById("scanMode").value);
+    localStorage.setItem(CK,document.getElementById("apiKey").value.trim());localStorage.removeItem("nb_models");localStorage.setItem("nb_ctx",document.getElementById("ctxOn").checked?"on":"off");localStorage.setItem("nb_offline",document.getElementById("offOn").checked?"on":"off");localStorage.setItem("nb_gemma",document.getElementById("gemOn").checked?"on":"off");localStorage.setItem("nb_scanmode",document.getElementById("scanMode").value);
     
   }catch(e){}
   document.getElementById("cset").classList.remove("open");toast("Settings saved","ok");
@@ -1307,15 +1312,66 @@ function addOpenBtns(d,ids){
     b.onclick=()=>{saveSilently();const old=current();currentId=n.id;dropEmpty(old);loadCurrent();closeChat()};r.appendChild(b)});
   if(r.children.length)d.appendChild(r);
 }
+/* ---------- Offline AI chat (Gemma 3 1B, on phone) ---------- */
+let gemmaInst=false,gemP=null;
+function isNative(){return !!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())}
+function gemmaP(){if(!gemP){if(!(window.Capacitor&&Capacitor.registerPlugin))throw new Error("Offline AI works only in the installed app");gemP=Capacitor.registerPlugin("Gemma")}return gemP}
+function gemmaOn(){return gemmaInst&&isNative()&&lsGet("nb_gemma")!=="off"}
+async function gemRefresh(){
+  const el=document.getElementById("gemSt");
+  if(!isNative()){gemmaInst=false;if(el)el.textContent="Works only in the installed app (APK)";return}
+  try{const s=await gemmaP().status();gemmaInst=!!s.installed;if(el)el.textContent=s.installed?"Model ready ("+s.sizeMB+" MB)":"Model not added yet"}
+  catch(e){gemmaInst=false;if(el)el.textContent="Offline AI plugin not found: "+String((e&&e.message)||e)}
+}
+async function gemPick(){
+  if(!isNative()){toast("Works only in the installed app");return}
+  const el=document.getElementById("gemSt");if(el)el.textContent="Copying model... please wait (can take a minute)";
+  try{const r=await gemmaP().pickModel();toast("Model added ("+r.sizeMB+" MB)")}catch(e){toast(String((e&&e.message)||e))}
+  gemRefresh();
+}
+async function gemRemove(){try{await gemmaP().removeModel()}catch(e){}gemRefresh()}
+function gemmaPick(q){
+  const toks=offTokens(q.toLowerCase());
+  const rel=live().map(n=>({n,h:offHits(n,toks)})).filter(x=>x.h>=2).sort((a,b)=>b.h-a.h).slice(0,3);
+  return rel.length?{ids:rel.map(x=>x.n.id),rel,toks}:null;
+}
+function gemmaSnip(n,toks,max){
+  const lines=(n.text||"").split("\n").filter(x=>x.trim()),hit=lines.filter(l=>toks.some(t=>l.toLowerCase().includes(t))),s=(hit.length?hit:lines).join("\n");
+  return s.length>max?s.slice(0,max)+"...":s;
+}
+function gemmaPrompt(q,gq){
+  let ctx="";
+  gq.rel.forEach(x=>{const n=x.n;ctx+="["+fmt(createdOf(n))+"] "+(n.title||"Untitled")+"\n"+gemmaSnip(n,gq.toks,650)+"\n\n"});
+  return "<start_of_turn>user\nYou are the assistant of a private diary. Answer ONLY from the diary notes below. Reply in the same language as the question, in at most 5 short lines. If the notes do not contain the answer, say so.\n\nDIARY NOTES:\n"+ctx.slice(0,2000)+"\nQUESTION: "+q.slice(0,300)+"<end_of_turn>\n<start_of_turn>model\n";
+}
+async function gemmaAsk(q,gq){
+  const r=await Promise.race([gemmaP().generate({prompt:gemmaPrompt(q,gq)}),new Promise((_,rej)=>setTimeout(()=>rej(new Error("Offline AI took too long")),180000))]);
+  return String((r&&r.text)||"").replace(/<end_of_turn>[\s\S]*$/,"").trim();
+}
+gemRefresh();
 async function sendChat(){
   const inp=document.getElementById("cinput");
   let q=inp.value.trim();if(!q&&!chatAtt)return;if(!q)q="Make a clean note from this photo/file";
-  const key=getKey(),rt=routeChat(q,!!chatAtt);
-  if(!key&&rt.mode==="online"){document.getElementById("cset").classList.add("open");toast("Add your API key first");return}
+  const key=getKey(),rt=routeChat(q,!!chatAtt),gq=(!chatAtt&&(rt.mode==="online"||rt.mode==="stop")&&gemmaOn())?gemmaPick(q):null;
+  if(!key&&rt.mode==="online"&&!gq){document.getElementById("cset").classList.add("open");toast("Add your API key first");return}
   const att=chatAtt,shown=(att?"Attached: "+att.name+"\n":"")+q;chatAtt=null;renderAtt();
   inp.value="";addMsg("u",shown);
   history.push({role:"user",parts:[{text:shown}]});
   const wait=addMsg("a","Thinking...");
+  if(gq){
+    wait.textContent="Offline AI is thinking (first time can take a little longer)...";
+    try{
+      const a=await gemmaAsk(q,gq);
+      if(!a)throw new Error("Empty answer");
+      wait.innerHTML=md(a)+'<div class="src">Offline AI (Gemma 3 1B) · answered on your phone from your diary, nothing was sent online</div>';
+      addOpenBtns(wait,gq.ids);history.push({role:"model",parts:[{text:a}]});saveChat();
+      const bx1=document.getElementById("msgs");bx1.scrollTop=bx1.scrollHeight;return;
+    }catch(e){
+      toast("Offline AI: "+String((e&&e.message)||e).slice(0,120));
+      if(rt.mode==="online"&&(!key||!navigator.onLine)){wait.textContent="Offline AI could not answer ("+String((e&&e.message)||e).slice(0,160)+")";return}
+      wait.textContent="Thinking...";
+    }
+  }
   if(rt.mode!=="online"){
     wait.innerHTML=md(rt.text)+(rt.mode==="local"?'<div class="src">Offline answer · from your diary, nothing was sent online</div>':"");
     if(rt.ids&&rt.ids.length)addOpenBtns(wait,rt.ids);
