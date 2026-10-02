@@ -787,8 +787,8 @@ async function mlRun(cv,lang,q){
 async function mlText(cv,lang,q){return (await mlRun(cv,lang,q)).text}
 async function scanMLKit(c,lang,st){
   if(!mlP){
-    if(!(window.Capacitor&&Capacitor.registerPlugin))throw new Error("ML Kit works only in the installed app");
-    mlP=Capacitor.registerPlugin("MlKitOcr");
+    mlP=capPlugin("MlKitOcr");
+    if(!mlP)throw new Error("ML Kit works only in the installed app");
   }
   const say=m=>{if(st)st.innerHTML=ic("sparkles")+m};
   c=shrink(c,2000);
@@ -1313,9 +1313,10 @@ function addOpenBtns(d,ids){
   if(r.children.length)d.appendChild(r);
 }
 /* ---------- Offline AI chat (Gemma 3 1B, on phone) ---------- */
+function capPlugin(n){const C=window.Capacitor;if(!C)return null;if(C.Plugins&&C.Plugins[n])return C.Plugins[n];if(C.registerPlugin)return C.registerPlugin(n);return null}
 let gemmaInst=false,gemP=null;
 function isNative(){return !!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform())}
-function gemmaP(){if(!gemP){if(!(window.Capacitor&&Capacitor.registerPlugin))throw new Error("Offline AI works only in the installed app");gemP=Capacitor.registerPlugin("Gemma")}return gemP}
+function gemmaP(){if(!gemP){gemP=capPlugin("Gemma");if(!gemP)throw new Error("Offline AI plugin missing in this app build")}return gemP}
 function gemmaOn(){return gemmaInst&&isNative()&&lsGet("nb_gemma")!=="off"}
 async function gemRefresh(){
   const el=document.getElementById("gemSt");
